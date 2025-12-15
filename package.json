@@ -1,7 +1,7 @@
 {
-  "name": "ventuals-contracts-scripts",
+  "name": "phype-lst",
   "version": "1.0.0",
-  "description": "JavaScript scripts for interacting with Ventuals contracts",
+  "description": "pHYPE Liquid Staking Token for Hyperliquid",
   "main": "index.js",
   "scripts": {
     "deposit": "node scripts/call-deposit.js",

@@ -1,20 +1,27 @@
-# Ventuals Contracts
+# pHYPE - Liquid Staked HYPE
 
-[![Tests](https://github.com/ventuals/ventuals-contracts/actions/workflows/test.yml/badge.svg)](https://github.com/ventuals/ventuals-contracts/actions/workflows/test.yml)
-[![Lint](https://github.com/ventuals/ventuals-contracts/actions/workflows/lint.yml/badge.svg)](https://github.com/ventuals/ventuals-contracts/actions/workflows/lint.yml)
+pHYPE is a liquid staking token (LST) for HYPE on Hyperliquid, based on the Ventuals vHYPE architecture.
 
 ## Overview
 
-Smart contracts for the Ventuals HYPE LST (vHYPE).
+- **Token**: pHYPE (Liquid Staked HYPE)
+- **Minimum Stake**: 500,000 HYPE (HIP-3 requirement)
+- **Batch Processing**: 24 hours
+- **Unstaking Period**: 7 days
+- **Architecture**: Based on Ventuals vHYPE contracts
 
-Ventuals is raising HYPE through a custom liquid staking token (LST) for its
-HIP-3 deployment. Contributors receive vHYPE, which is a fully transferable
-ERC20 that represents a claim on the underlying HYPE principal.
+## Contracts
 
-- Minimum stake: 500k HYPE must remain staked with validators, which is the
-  current requirement for HIP-3 deployers.
-- Liquidity: Additional deposits provide a liquidity buffer for withdrawals.
-- Native yield: All native staking yield accrues proportionally to vHYPE holders.
+- `PHYPE.sol` - ERC20 LST token
+- `StakingVault.sol` - Core staking logic
+- `StakingVaultManager.sol` - HyperCore integration
+- `RoleRegistry.sol` - Access control
+
+## Roles
+
+- **OWNER**: Multisig wallet (full admin control)
+- **MANAGER**: StakingVaultManager (HIP-3 deployer)
+- **OPERATOR**: Bot wallet (executes batches)
 
 ## Getting Started
 
@@ -45,9 +52,20 @@ forge coverage
 
 ## Security
 
-The Ventuals smart contracts undergo independent security audits, and available audit reports are published in [docs/audits](docs/audits). We recommend
-that all integrators and contributors review these reports before interacting with the contracts.
+- Based on audited Ventuals contracts
+- All staking logic unchanged from original
+- Custom deployment with personal addresses
+
+## Attribution
+
+pHYPE is based on the Ventuals vHYPE liquid staking token contracts.
+
+Original repository: https://github.com/ventuals/ventuals-contracts
+
+pHYPE maintains the same core staking logic, timing parameters, and security architecture as vHYPE, with customizations for personal deployment.
+
+We thank the Ventuals team for open-sourcing their high-quality LST implementation.
 
 ## License
 
-The Ventuals smart contracts are licensed under Apache License 2.0.
+Apache-2.0 (same as Ventuals)

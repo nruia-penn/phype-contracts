@@ -64,7 +64,7 @@ interface IStakingVaultManager {
 
     /// @notice Emitted when HYPE is deposited into the vault
     /// @param depositor The address that deposited the HYPE
-    /// @param minted The amount of vHYPE minted (in 18 decimals)
+    /// @param minted The amount of pHYPE minted (in 18 decimals)
     /// @param deposited The amount of HYPE deposited (in 18 decimals)
     event Deposit(address indexed depositor, uint256 minted, uint256 deposited);
 
@@ -131,8 +131,8 @@ interface IStakingVaultManager {
 
     /// @dev A batch of withdraws that are processed together
     struct Batch {
-        /// @dev The total amount of withdraws processed in this batch (vHYPE; in 18 decimals)
-        uint256 vhypeProcessed;
+        /// @dev The total amount of withdraws processed in this batch (pHYPE; in 18 decimals)
+        uint256 phypeProcessed;
         /// @dev The exchange rate at the time the batch was processed (in 18 decimals)
         uint256 snapshotExchangeRate;
         /// @dev The exchange rate if a slash was applied to the batch (in 18 decimals)
@@ -149,8 +149,8 @@ interface IStakingVaultManager {
         uint256 id;
         /// @dev The account that requested the withdraw
         address account;
-        /// @dev The amount of vHYPE to redeem (in 18 decimals)
-        uint256 vhypeAmount;
+        /// @dev The amount of pHYPE to redeem (in 18 decimals)
+        uint256 phypeAmount;
         /// @dev The timestamp at which the withdraw was queued
         uint256 queuedAt;
         /// @dev The index of the batch this withdraw was assigned to
@@ -162,13 +162,13 @@ interface IStakingVaultManager {
         uint256 claimedAt;
     }
 
-    /// @notice Deposits HYPE into the vault, and mints the equivalent amount of vHYPE.
+    /// @notice Deposits HYPE into the vault, and mints the equivalent amount of pHYPE.
     function deposit() external payable;
 
     /// @notice Queues a withdraw from the vault
-    /// @param vhypeAmount The amount of vHYPE to redeem (in 18 decimals)
+    /// @param phypeAmount The amount of pHYPE to redeem (in 18 decimals)
     /// @return The IDs of the withdraws
-    function queueWithdraw(uint256 vhypeAmount) external returns (uint256[] memory);
+    function queueWithdraw(uint256 phypeAmount) external returns (uint256[] memory);
 
     /// @notice Claims a withdraw
     /// @param withdrawId The ID of the withdraw to claim
@@ -215,20 +215,20 @@ interface IStakingVaultManager {
     /// @param withdrawId The ID of the withdraw to return
     function getWithdrawClaimableAt(uint256 withdrawId) external view returns (uint256);
 
-    /// @notice Calculates the vHYPE amount for a given HYPE amount, based on the exchange rate
+    /// @notice Calculates the pHYPE amount for a given HYPE amount, based on the exchange rate
     /// @param hypeAmount The HYPE amount to convert (in 18 decimals)
-    /// @return The vHYPE amount (in 18 decimals)
+    /// @return The pHYPE amount (in 18 decimals)
     /// forge-lint: disable-next-line(mixed-case-function)
-    function HYPETovHYPE(uint256 hypeAmount) external view returns (uint256);
+    function HYPEToPHYPE(uint256 hypeAmount) external view returns (uint256);
 
-    /// @notice Calculates the HYPE amount for a given vHYPE amount, based on the exchange rate
-    /// @param vHYPEAmount The vHYPE amount to convert (in 18 decimals)
+    /// @notice Calculates the HYPE amount for a given pHYPE amount, based on the exchange rate
+    /// @param phypeAmount The pHYPE amount to convert (in 18 decimals)
     /// @return The HYPE amount (in 18 decimals)
     /// forge-lint: disable-next-line(mixed-case-function, mixed-case-variable)
-    function vHYPEtoHYPE(uint256 vHYPEAmount) external view returns (uint256);
+    function pHYPEToHYPE(uint256 phypeAmount) external view returns (uint256);
 
-    /// @notice Returns the exchange rate of HYPE to vHYPE (in 18 decimals)
-    /// @dev Ratio of total HYPE in the staking vault to vHYPE
+    /// @notice Returns the exchange rate of HYPE to pHYPE (in 18 decimals)
+    /// @dev Ratio of total HYPE in the staking vault to pHYPE
     function exchangeRate() external view returns (uint256);
 
     /// @notice Returns the total HYPE balance that belongs to the vault (in 18 decimals)

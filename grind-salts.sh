@@ -6,25 +6,27 @@ set -e
 
 # Configuration
 # TODO: Update these values for the current environment
-OWNER=
-IS_TESTNET=
-IS_TEST_VAULT=
+OWNER=0xBF52C2795e8a203fbe43dbF26fd662923d98cE03
+IS_TESTNET=true
+IS_TEST_VAULT=true
 
 # Vault config for mainnet production
 # TODO: Check that these match the values in DeployContracts.s.sol
-MIN_STAKE_BALANCE=500000000000000000000000  # 500k HYPE
-MIN_DEPOSIT=1000000000000000000  # 1 HYPE
-MIN_WITHDRAW=500000000000000000  # 0.5 HYPE
-MAX_WITHDRAW=10000000000000000000000  # 10k HYPE
+MIN_STAKE_BALANCE=1000000000000000000  # 1 HYPE
+MIN_DEPOSIT=10000000000000000    # 0.01 HYPE
+MIN_WITHDRAW=10000000000000000  # 0.1 HYPE
+MAX_WITHDRAW=20000000000000000    # 0.02 HYPE
 
 # Mainnet configuration
-VALIDATOR=0x5aC99df645F3414876C816Caa18b2d234024b487
+VALIDATOR=0x946bF3135c7D15E4462b510f74B6e304AABb5B21
 VALIDATOR_1=0x5aC99df645F3414876C816Caa18b2d234024b487
 VALIDATOR_2=0xA82FE73bBD768bC15D1eF2F6142a21fF8bD762AD
 VALIDATOR_3=0x80f0CD23DA5BF3a0101110cfD0F89C8a69a1384d
 VALIDATOR_4=0xdF35aee8ef5658686142ACd1E5AB5DBcDF8c51e8
 VALIDATOR_5=0x66Be52ec79F829Cc88E5778A255E2cb9492798fd
-HYPE_TOKEN_ID=150
+VALIDATOR_TEST=0x946bF3135c7D15E4462b510f74B6e304AABb5B21
+HYPE_TOKEN_ID=1105
+# 150 for mainnet hype token id
 
 echo "======================================"
 echo "CREATE2 Salt Grinding Script"
@@ -54,14 +56,14 @@ echo "   Address: $ROLE_REGISTRY_IMPL"
 echo "   Salt: $ROLE_REGISTRY_IMPL_SALT"
 echo ""
 
-# 2. VHYPE Implementation
-echo "2/4 Grinding VHYPE Implementation..."
-VHYPE_IMPL_BYTECODE=$(forge inspect VHYPE bytecode)
-VHYPE_IMPL_RESULT=$(cast create2 --starts-with 0000000 --init-code $VHYPE_IMPL_BYTECODE)
-VHYPE_IMPL=$(echo "$VHYPE_IMPL_RESULT" | grep "Address:" | awk '{print $2}')
-VHYPE_IMPL_SALT=$(echo "$VHYPE_IMPL_RESULT" | grep "Salt:" | awk '{print $2}')
-echo "   Address: $VHYPE_IMPL"
-echo "   Salt: $VHYPE_IMPL_SALT"
+# 2. PHYPE Implementation
+echo "2/4 Grinding PHYPE Implementation..."
+PHYPE_IMPL_BYTECODE=$(forge inspect PHYPE bytecode)
+PHYPE_IMPL_RESULT=$(cast create2 --starts-with 0000000 --init-code $PHYPE_IMPL_BYTECODE)
+PHYPE_IMPL=$(echo "$PHYPE_IMPL_RESULT" | grep "Address:" | awk '{print $2}')
+PHYPE_IMPL_SALT=$(echo "$PHYPE_IMPL_RESULT" | grep "Salt:" | awk '{print $2}')
+echo "   Address: $PHYPE_IMPL"
+echo "   Salt: $PHYPE_IMPL_SALT"
 echo ""
 
 # 3. StakingVault Implementation (with constructor arg!)
@@ -107,16 +109,16 @@ echo "   Address: $ROLE_REGISTRY_PROXY"
 echo "   Salt: $ROLE_REGISTRY_PROXY_SALT"
 echo ""
 
-# 2. VHYPE Proxy
-echo "2/4 Grinding VHYPE Proxy..."
-VHYPE_INIT_DATA=$(cast calldata "initialize(address)" $ROLE_REGISTRY_PROXY)
-VHYPE_PROXY_CONSTRUCTOR_ARGS=$(cast abi-encode "constructor(address,bytes)" $VHYPE_IMPL $VHYPE_INIT_DATA)
-VHYPE_PROXY_INIT_CODE=$(cast concat-hex $PROXY_BYTECODE $VHYPE_PROXY_CONSTRUCTOR_ARGS)
-VHYPE_PROXY_RESULT=$(cast create2 --starts-with 8888888 --init-code $VHYPE_PROXY_INIT_CODE)
-VHYPE_PROXY=$(echo "$VHYPE_PROXY_RESULT" | grep "Address:" | awk '{print $2}')
-VHYPE_PROXY_SALT=$(echo "$VHYPE_PROXY_RESULT" | grep "Salt:" | awk '{print $2}')
-echo "   Address: $VHYPE_PROXY"
-echo "   Salt: $VHYPE_PROXY_SALT"
+# 2. PHYPE Proxy
+echo "2/4 Grinding PHYPE Proxy..."
+PHYPE_INIT_DATA=$(cast calldata "initialize(address)" $ROLE_REGISTRY_PROXY)
+PHYPE_PROXY_CONSTRUCTOR_ARGS=$(cast abi-encode "constructor(address,bytes)" $PHYPE_IMPL $PHYPE_INIT_DATA)
+PHYPE_PROXY_INIT_CODE=$(cast concat-hex $PROXY_BYTECODE $PHYPE_PROXY_CONSTRUCTOR_ARGS)
+PHYPE_PROXY_RESULT=$(cast create2 --starts-with 8888888 --init-code $PHYPE_PROXY_INIT_CODE)
+PHYPE_PROXY=$(echo "$PHYPE_PROXY_RESULT" | grep "Address:" | awk '{print $2}')
+PHYPE_PROXY_SALT=$(echo "$PHYPE_PROXY_RESULT" | grep "Salt:" | awk '{print $2}')
+echo "   Address: $PHYPE_PROXY"
+echo "   Salt: $PHYPE_PROXY_SALT"
 echo ""
 
 # 3. StakingVault Proxy
@@ -136,7 +138,7 @@ echo ""
 echo "4/4 Grinding StakingVaultManager Proxy..."
 STAKING_VAULT_MANAGER_INIT_DATA=$(cast calldata "initialize(address,address,address,address,uint256,uint256,uint256,uint256)" \
   $ROLE_REGISTRY_PROXY \
-  $VHYPE_PROXY \
+  $PHYPE_PROXY \
   $STAKING_VAULT_PROXY \
   $VALIDATOR \
   $MIN_STAKE_BALANCE \
@@ -165,24 +167,24 @@ cat > .env.salts << EOF
 
 # Implementation Salts
 ROLE_REGISTRY_IMPL_SALT=$ROLE_REGISTRY_IMPL_SALT
-VHYPE_IMPL_SALT=$VHYPE_IMPL_SALT
+PHYPE_IMPL_SALT=$PHYPE_IMPL_SALT
 STAKING_VAULT_IMPL_SALT=$STAKING_VAULT_IMPL_SALT
 STAKING_VAULT_MANAGER_IMPL_SALT=$STAKING_VAULT_MANAGER_IMPL_SALT
 
 # Proxy Salts
 ROLE_REGISTRY_PROXY_SALT=$ROLE_REGISTRY_PROXY_SALT
-VHYPE_PROXY_SALT=$VHYPE_PROXY_SALT
+PHYPE_PROXY_SALT=$PHYPE_PROXY_SALT
 STAKING_VAULT_PROXY_SALT=$STAKING_VAULT_PROXY_SALT
 STAKING_VAULT_MANAGER_PROXY_SALT=$STAKING_VAULT_MANAGER_PROXY_SALT
 
 # Expected Addresses (for verification)
 ROLE_REGISTRY_IMPL=$ROLE_REGISTRY_IMPL
-VHYPE_IMPL=$VHYPE_IMPL
+PHYPE_IMPL=$PHYPE_IMPL
 STAKING_VAULT_IMPL=$STAKING_VAULT_IMPL
 STAKING_VAULT_MANAGER_IMPL=$STAKING_VAULT_MANAGER_IMPL
 
 ROLE_REGISTRY_PROXY=$ROLE_REGISTRY_PROXY
-VHYPE_PROXY=$VHYPE_PROXY
+PHYPE_PROXY=$PHYPE_PROXY
 STAKING_VAULT_PROXY=$STAKING_VAULT_PROXY
 STAKING_VAULT_MANAGER_PROXY=$STAKING_VAULT_MANAGER_PROXY
 EOF
@@ -197,13 +199,13 @@ echo "======================================"
 echo ""
 echo "IMPLEMENTATIONS:"
 echo "  RoleRegistry:         $ROLE_REGISTRY_IMPL"
-echo "  VHYPE:                $VHYPE_IMPL"
+echo "  PHYPE:                $PHYPE_IMPL"
 echo "  StakingVault:         $STAKING_VAULT_IMPL"
 echo "  StakingVaultManager:  $STAKING_VAULT_MANAGER_IMPL"
 echo ""
 echo "PROXIES (User-facing):"
 echo "  RoleRegistry:         $ROLE_REGISTRY_PROXY"
-echo "  VHYPE:                $VHYPE_PROXY"
+echo "  PHYPE:                $PHYPE_PROXY"
 echo "  StakingVault:         $STAKING_VAULT_PROXY"
 echo "  StakingVaultManager:  $STAKING_VAULT_MANAGER_PROXY"
 echo ""

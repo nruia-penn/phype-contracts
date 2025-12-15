@@ -7,14 +7,17 @@ import {
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import {Base} from "./Base.sol";
 
-contract VHYPE is Base, ERC20Upgradeable, ERC20BurnableUpgradeable {
+/// @title pHYPE Token
+/// @notice Liquid Staked HYPE token for Hyperliquid
+/// @dev Based on Ventuals vHYPE contracts
+contract PHYPE is Base, ERC20Upgradeable, ERC20BurnableUpgradeable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
     function initialize(address _roleRegistry) public initializer {
-        __ERC20_init("vHYPE", "vHYPE");
+        __ERC20_init("PHype Liquid Staked HYPE", "pHYPE");
         __ERC20Burnable_init();
         __Base_init(_roleRegistry);
     }
@@ -31,3 +34,4 @@ contract VHYPE is Base, ERC20Upgradeable, ERC20BurnableUpgradeable {
         super.burnFrom(account, amount);
     }
 }
+

@@ -6,7 +6,7 @@ import {IStakingVaultManager} from "./interfaces/IStakingVaultManager.sol";
 import {L1ReadLibrary} from "./libraries/L1ReadLibrary.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Base} from "./Base.sol";
-import {VHYPE} from "./VHYPE.sol";
+import {PHYPE} from "./PHYPE.sol";
 import {Converters} from "./libraries/Converters.sol";
 import {StructuredLinkedList} from "./libraries/StructuredLinkedList.sol";
 
@@ -15,7 +15,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
     using StructuredLinkedList for StructuredLinkedList.List;
 
     /// forge-lint: disable-next-line(mixed-case-variable)
-    VHYPE public vHYPE;
+    PHYPE public pHYPE;
 
     IStakingVault public stakingVault;
 
@@ -78,7 +78,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
     function initialize(
         address _roleRegistry,
         /// forge-lint: disable-next-line(mixed-case-variable)
-        address _vHYPE,
+        address _pHYPE,
         address _stakingVault,
         address _validator,
         uint256 _minimumStakeBalance,
@@ -88,7 +88,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
     ) public initializer {
         __Base_init(_roleRegistry);
 
-        vHYPE = VHYPE(_vHYPE);
+        pHYPE = PHYPE(_pHYPE);
         stakingVault = IStakingVault(payable(_stakingVault));
 
         validator = _validator;
@@ -113,13 +113,13 @@ contract StakingVaultManager is Base, IStakingVaultManager {
     function deposit() external payable canDeposit whenNotPaused {
         uint256 amountToDeposit = msg.value.stripUnsafePrecision();
 
-        // Mint vHYPE
-        // IMPORTANT: We need to make sure that we mint the vHYPE _before_ transferring the HYPE to the staking vault,
+        // Mint pHYPE
+        // IMPORTANT: We need to make sure that we mint the pHYPE _before_ transferring the HYPE to the staking vault,
         // otherwise the exchange rate will be incorrect. We want the exchange rate to be calculated based on the total
         // HYPE in the vault _before_ the deposit
-        uint256 amountToMint = HYPETovHYPE(amountToDeposit);
+        uint256 amountToMint = HYPEToPHYPE(amountToDeposit);
         require(amountToMint > 0, ZeroAmount());
-        vHYPE.mint(msg.sender, amountToMint);
+        pHYPE.mint(msg.sender, amountToMint);
 
         // Transfer HYPE to staking vault (HyperEVM -> HyperEVM)
         if (amountToDeposit > 0) {
@@ -130,15 +130,15 @@ contract StakingVaultManager is Base, IStakingVaultManager {
     }
 
     /// @inheritdoc IStakingVaultManager
-    function queueWithdraw(uint256 vhypeAmount) external whenNotPaused returns (uint256[] memory) {
-        require(vhypeAmount > 0, ZeroAmount());
-        require(vHYPEtoHYPE(vhypeAmount) >= minimumWithdrawAmount, BelowMinimumWithdrawAmount());
+    function queueWithdraw(uint256 phypeAmount) external whenNotPaused returns (uint256[] memory) {
+        require(phypeAmount > 0, ZeroAmount());
+        require(pHYPEToHYPE(phypeAmount) >= minimumWithdrawAmount, BelowMinimumWithdrawAmount());
 
-        // This contract escrows the vHYPE until the withdraw is processed
-        bool success = vHYPE.transferFrom(msg.sender, address(this), vhypeAmount);
-        require(success, TransferFailed(msg.sender, vhypeAmount));
+        // This contract escrows the pHYPE until the withdraw is processed
+        bool success = pHYPE.transferFrom(msg.sender, address(this), phypeAmount);
+        require(success, TransferFailed(msg.sender, phypeAmount));
 
-        uint256[] memory withdrawAmounts = _splitWithdraws(vhypeAmount);
+        uint256[] memory withdrawAmounts = _splitWithdraws(phypeAmount);
         uint256[] memory withdrawIds = new uint256[](withdrawAmounts.length);
         for (uint256 i = 0; i < withdrawAmounts.length; i++) {
             uint256 withdrawId = nextWithdrawId;
@@ -147,7 +147,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
             Withdraw memory withdraw = Withdraw({
                 id: withdrawId,
                 account: msg.sender,
-                vhypeAmount: withdrawAmounts[i],
+                phypeAmount: withdrawAmounts[i],
                 queuedAt: block.timestamp,
                 batchIndex: type(uint256).max, // Not assigned to a batch yet
                 cancelledAt: 0,
@@ -170,22 +170,22 @@ contract StakingVaultManager is Base, IStakingVaultManager {
         return withdrawIds;
     }
 
-    function _splitWithdraws(uint256 vhypeAmount) internal view returns (uint256[] memory) {
+    function _splitWithdraws(uint256 phypeAmount) internal view returns (uint256[] memory) {
         uint256 _exchangeRate = exchangeRate();
-        uint256 maximumWithdrawVhypeAmount = _HYPETovHYPE(maximumWithdrawAmount, _exchangeRate);
+        uint256 maximumWithdrawPhypeAmount = _HYPEToPHYPE(maximumWithdrawAmount, _exchangeRate);
 
         // Calculate number of withdraws needed
-        uint256 withdrawCount = (vhypeAmount + maximumWithdrawVhypeAmount - 1) / maximumWithdrawVhypeAmount;
+        uint256 withdrawCount = (phypeAmount + maximumWithdrawPhypeAmount - 1) / maximumWithdrawPhypeAmount;
 
         // Check if the last chunk would be below threshold
-        uint256 lastChunkVhypeAmount = vhypeAmount % maximumWithdrawVhypeAmount;
-        uint256 lastChunkHypeAmount = _vHYPEtoHYPE(lastChunkVhypeAmount, _exchangeRate);
-        if (lastChunkVhypeAmount > 0 && lastChunkHypeAmount < minimumWithdrawAmount && withdrawCount > 1) {
+        uint256 lastChunkPhypeAmount = phypeAmount % maximumWithdrawPhypeAmount;
+        uint256 lastChunkHypeAmount = _PHYPEToHYPE(lastChunkPhypeAmount, _exchangeRate);
+        if (lastChunkPhypeAmount > 0 && lastChunkHypeAmount < minimumWithdrawAmount && withdrawCount > 1) {
             withdrawCount--; // Merge last chunk into previous one
         }
 
         uint256[] memory withdrawAmounts = new uint256[](withdrawCount);
-        uint256 remaining = vhypeAmount;
+        uint256 remaining = phypeAmount;
 
         for (uint256 i = 0; i < withdrawCount; i++) {
             if (i == withdrawCount - 1) {
@@ -193,8 +193,8 @@ contract StakingVaultManager is Base, IStakingVaultManager {
                 withdrawAmounts[i] = remaining;
             } else {
                 // Take maximum for all other withdrawals
-                withdrawAmounts[i] = maximumWithdrawVhypeAmount;
-                remaining -= maximumWithdrawVhypeAmount;
+                withdrawAmounts[i] = maximumWithdrawPhypeAmount;
+                remaining -= maximumWithdrawPhypeAmount;
             }
         }
 
@@ -238,7 +238,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
         );
 
         uint256 withdrawExchangeRate = batch.slashed ? batch.slashedExchangeRate : batch.snapshotExchangeRate;
-        uint256 hypeAmount = _vHYPEtoHYPE(withdraw.vhypeAmount, withdrawExchangeRate);
+        uint256 hypeAmount = _PHYPEToHYPE(withdraw.phypeAmount, withdrawExchangeRate);
 
         withdraw.claimedAt = block.timestamp;
         totalHypeClaimed += hypeAmount;
@@ -261,10 +261,10 @@ contract StakingVaultManager is Base, IStakingVaultManager {
         // Set cancelled timestamp
         withdraw.cancelledAt = block.timestamp;
 
-        // Refund vHYPE
-        uint256 vhypeAmount = withdraw.vhypeAmount;
-        bool success = vHYPE.transfer(msg.sender, vhypeAmount);
-        require(success, TransferFailed(msg.sender, vhypeAmount));
+        // Refund pHYPE
+        uint256 phypeAmount = withdraw.phypeAmount;
+        bool success = pHYPE.transfer(msg.sender, phypeAmount);
+        require(success, TransferFailed(msg.sender, phypeAmount));
 
         emit CancelWithdraw(msg.sender, withdrawId, withdraw);
     }
@@ -273,7 +273,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
     function processBatch(uint256 numWithdrawals) public whenNotPaused whenBatchProcessingNotPaused returns (uint256) {
         Batch memory batch = _fetchBatch();
 
-        uint256 hypeProcessed = _vHYPEtoHYPE(batch.vhypeProcessed, batch.snapshotExchangeRate);
+        uint256 hypeProcessed = _PHYPEToHYPE(batch.phypeProcessed, batch.snapshotExchangeRate);
         uint256 balance = totalBalance();
         uint256 withdrawCapacityAvailable = 0;
         if (balance >= minimumStakeBalance + hypeProcessed) {
@@ -294,7 +294,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
 
             Withdraw storage withdraw = withdraws[nextNodeId];
 
-            uint256 expectedHypeAmount = _vHYPEtoHYPE(withdraw.vhypeAmount, batch.snapshotExchangeRate);
+            uint256 expectedHypeAmount = _PHYPEToHYPE(withdraw.phypeAmount, batch.snapshotExchangeRate);
             if (expectedHypeAmount > withdrawCapacityAvailable) {
                 break;
             }
@@ -307,7 +307,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
 
             // Update batch metrics (in memory)
             if (withdraw.cancelledAt == 0) {
-                batch.vhypeProcessed += withdraw.vhypeAmount;
+                batch.phypeProcessed += withdraw.phypeAmount;
             }
 
             // Update withdrawal information
@@ -351,7 +351,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
             uint256 snapshotExchangeRate = exchangeRate();
 
             return Batch({
-                vhypeProcessed: 0,
+                phypeProcessed: 0,
                 snapshotExchangeRate: snapshotExchangeRate,
                 slashedExchangeRate: 0,
                 slashed: false,
@@ -383,7 +383,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
         _canFinalizeBatch(batch);
 
         uint256 depositsInBatch = stakingVault.evmBalance();
-        uint256 withdrawsInBatch = _vHYPEtoHYPE(batch.vhypeProcessed, batch.snapshotExchangeRate);
+        uint256 withdrawsInBatch = _PHYPEToHYPE(batch.phypeProcessed, batch.snapshotExchangeRate);
 
         // Update totalHypeProcessed to track reserved HYPE for withdrawals
         totalHypeProcessed += withdrawsInBatch;
@@ -392,8 +392,8 @@ contract StakingVaultManager is Base, IStakingVaultManager {
         batches[currentBatchIndex].finalizedAt = block.timestamp;
         lastFinalizedBatchTime = block.timestamp;
 
-        // Burn the escrowed vHYPE (burn from this contract's balance)
-        vHYPE.burn(batch.vhypeProcessed);
+        // Burn the escrowed pHYPE (burn from this contract's balance)
+        pHYPE.burn(batch.phypeProcessed);
 
         L1ReadLibrary.DelegatorSummary memory delegatorSummary = stakingVault.delegatorSummary();
         L1ReadLibrary.SpotBalance memory spotBalance = stakingVault.spotBalance(stakingVault.HYPE_TOKEN_ID());
@@ -434,7 +434,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
     function _canFinalizeBatch(Batch memory batch) internal view {
         require(currentBatchIndex + 1 == batches.length, NothingToFinalize());
 
-        uint256 hypeProcessed = _vHYPEtoHYPE(batch.vhypeProcessed, batch.snapshotExchangeRate);
+        uint256 hypeProcessed = _PHYPEToHYPE(batch.phypeProcessed, batch.snapshotExchangeRate);
 
         // Make sure we have enough balance to cover the withdraws
         if (hypeProcessed > 0) {
@@ -470,17 +470,17 @@ contract StakingVaultManager is Base, IStakingVaultManager {
             return 0;
         }
 
-        uint256 vhypeAmount = withdraw.vhypeAmount;
+        uint256 phypeAmount = withdraw.phypeAmount;
 
         // If the withdraw hasn't been processed yet, use the current exchange rate
         if (withdraw.batchIndex == type(uint256).max) {
-            return vHYPEtoHYPE(vhypeAmount);
+            return pHYPEToHYPE(phypeAmount);
         }
 
         // Otherwise, use the exchange rate from the batch
         Batch memory batch = batches[withdraw.batchIndex];
         uint256 _exchangeRate = batch.slashed ? batch.slashedExchangeRate : batch.snapshotExchangeRate;
-        return _vHYPEtoHYPE(vhypeAmount, _exchangeRate);
+        return _PHYPEToHYPE(phypeAmount, _exchangeRate);
     }
 
     /// @inheritdoc IStakingVaultManager
@@ -500,12 +500,12 @@ contract StakingVaultManager is Base, IStakingVaultManager {
     }
 
     /// @inheritdoc IStakingVaultManager
-    function HYPETovHYPE(uint256 hypeAmount) public view returns (uint256) {
-        return _HYPETovHYPE(hypeAmount, exchangeRate());
+    function HYPEToPHYPE(uint256 hypeAmount) public view returns (uint256) {
+        return _HYPEToPHYPE(hypeAmount, exchangeRate());
     }
 
     /// forge-lint: disable-next-line(mixed-case-function)
-    function _HYPETovHYPE(uint256 hypeAmount, uint256 _exchangeRate) internal pure returns (uint256) {
+    function _HYPEToPHYPE(uint256 hypeAmount, uint256 _exchangeRate) internal pure returns (uint256) {
         if (_exchangeRate == 0) {
             return 0;
         }
@@ -513,24 +513,24 @@ contract StakingVaultManager is Base, IStakingVaultManager {
     }
 
     /// @inheritdoc IStakingVaultManager
-    function vHYPEtoHYPE(uint256 vHYPEAmount) public view returns (uint256) {
-        return _vHYPEtoHYPE(vHYPEAmount, exchangeRate());
+    function pHYPEToHYPE(uint256 phypeAmount) public view returns (uint256) {
+        return _PHYPEToHYPE(phypeAmount, exchangeRate());
     }
 
     /// forge-lint: disable-next-line(mixed-case-function, mixed-case-variable)
-    function _vHYPEtoHYPE(uint256 vHYPEAmount, uint256 _exchangeRate) internal pure returns (uint256) {
+    function _PHYPEToHYPE(uint256 phypeAmount, uint256 _exchangeRate) internal pure returns (uint256) {
         if (_exchangeRate == 0) {
             return 0;
         }
-        return Math.mulDiv(vHYPEAmount, _exchangeRate, 1e18);
+        return Math.mulDiv(phypeAmount, _exchangeRate, 1e18);
     }
 
     /// @inheritdoc IStakingVaultManager
     function exchangeRate() public view returns (uint256) {
         uint256 balance = totalBalance();
-        uint256 totalSupply = vHYPE.totalSupply();
+        uint256 totalSupply = pHYPE.totalSupply();
 
-        // If we have no vHYPE in circulation, the exchange rate is 1
+        // If we have no pHYPE in circulation, the exchange rate is 1
         if (totalSupply == 0) {
             return 1e18;
         }
@@ -599,7 +599,7 @@ contract StakingVaultManager is Base, IStakingVaultManager {
             StakingVaultManager.Batch memory batch = batches[currentBatchIndex];
             uint256 _exchangeRate = batch.slashed ? batch.slashedExchangeRate : batch.snapshotExchangeRate;
             require(
-                newWithdrawCapacity >= _vHYPEtoHYPE(batch.vhypeProcessed, _exchangeRate), MinimumStakeBalanceTooLarge()
+                newWithdrawCapacity >= _PHYPEToHYPE(batch.phypeProcessed, _exchangeRate), MinimumStakeBalanceTooLarge()
             );
         }
         minimumStakeBalance = _minimumStakeBalance;
@@ -666,8 +666,8 @@ contract StakingVaultManager is Base, IStakingVaultManager {
                 // Update the withdraw to unassign from batch
                 withdraw.batchIndex = type(uint256).max;
 
-                // Remove the vHYPE processed from the batch
-                batch.vhypeProcessed -= withdraw.vhypeAmount;
+                // Remove the pHYPE processed from the batch
+                batch.phypeProcessed -= withdraw.phypeAmount;
 
                 // Move to the previous withdraw in the queue
                 (bool prevNodeExists, uint256 prevNodeId) = withdrawQueue.getPreviousNode(lastProcessedWithdrawId);
@@ -693,9 +693,9 @@ contract StakingVaultManager is Base, IStakingVaultManager {
         require(currentBatchIndex < batches.length, NothingToFinalize());
         Batch storage batch = batches[currentBatchIndex];
 
-        // Can only finalize a batch that hasn't been finalized, and has been reset to 0 vHYPE
+        // Can only finalize a batch that hasn't been finalized, and has been reset to 0 pHYPE
         require(batch.finalizedAt == 0, InvalidBatch(currentBatchIndex));
-        require(batch.vhypeProcessed == 0, InvalidBatch(currentBatchIndex));
+        require(batch.phypeProcessed == 0, InvalidBatch(currentBatchIndex));
 
         // Remove the batch entirely
         batches.pop();
@@ -725,8 +725,8 @@ contract StakingVaultManager is Base, IStakingVaultManager {
         uint256 oldExchangeRate = batch.slashed ? batch.slashedExchangeRate : batch.snapshotExchangeRate;
 
         // Adjust totalHypeProcessed
-        totalHypeProcessed -= _vHYPEtoHYPE(batch.vhypeProcessed, oldExchangeRate);
-        totalHypeProcessed += _vHYPEtoHYPE(batch.vhypeProcessed, slashedExchangeRate);
+        totalHypeProcessed -= _PHYPEToHYPE(batch.phypeProcessed, oldExchangeRate);
+        totalHypeProcessed += _PHYPEToHYPE(batch.phypeProcessed, slashedExchangeRate);
 
         batch.slashedExchangeRate = slashedExchangeRate;
         batch.slashed = true;
